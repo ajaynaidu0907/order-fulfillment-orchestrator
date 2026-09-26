@@ -19,5 +19,6 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/api ./c
 FROM gcr.io/distroless/static-debian12:nonroot AS runtime
 COPY --from=build /out/api /out/worker /out/seed /out/migrate /usr/local/bin/
 USER nonroot:nonroot
-# Default entrypoint is the API; compose overrides `command` for other roles.
-ENTRYPOINT ["/usr/local/bin/api"]
+# Default to the API. This is CMD (not ENTRYPOINT) so Docker Compose can fully
+# replace it via `command:` to run the worker, migrate, or seed binaries.
+CMD ["/usr/local/bin/api"]

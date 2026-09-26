@@ -108,5 +108,21 @@ services:
         condition: service_completed_successfully
     restart: unless-stopped
 
+  # One-shot synthetic data loader. Not started by `up`; run via `make seed`
+  # (docker compose run --rm seed).
+  seed:
+    build: .
+    command: ["/usr/local/bin/seed"]
+    profiles: ["tools"]
+    environment:
+      <<: *app-env
+      OFO_SEED_ORDERS: "8"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: "no"
+
 volumes:
   pgdata:
