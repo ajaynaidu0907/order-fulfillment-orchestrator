@@ -21,3 +21,6 @@ coverage.html
 .DS_Store
 .idea/
 *.swp
+
+# Parallel-build worktrees (each is its own checkout on a feature branch)
+/.worktrees/

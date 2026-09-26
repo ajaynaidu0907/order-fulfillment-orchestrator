@@ -42,13 +42,26 @@ type Deps struct {
     Logger      *slog.Logger
 }
 func New(d Deps) *Orchestrator
-// Handle executes exactly one job (advance or compensate) and is idempotent.
+// Handle executes exactly one job (a forward step or a compensation action) and
+// is idempotent. For a forward step it performs the operation then calls
+// OrderStore.Transition to advance state AND enqueue the next job in one tx.
 func (o *Orchestrator) Handle(ctx context.Context, j domain.Job) error
+// Compensate is called by the worker when a job has exhausted its retries. It
+// looks up the order's current status, derives the needed compensations via
+// domain.CompensationsForCancel(status), and calls OrderStore.Transition to
+// move the order to FAILED while enqueueing release_inventory / refund_payment
+// jobs in the same tx.
+func (o *Orchestrator) Compensate(ctx context.Context, j domain.Job, cause string) error
 
-// internal/worker — the polling loop that claims jobs and calls the orchestrator
+// internal/worker — the polling loop that claims jobs and drives the processor.
+// Processor is satisfied by *orchestrator.Orchestrator.
+type Processor interface {
+    Handle(ctx context.Context, j domain.Job) error
+    Compensate(ctx context.Context, j domain.Job, cause string) error
+}
 type Deps struct {
     Jobs      domain.JobQueue
-    Handler   func(ctx context.Context, j domain.Job) error // orchestrator.Handle
+    Processor Processor
     Cfg       config.WorkerConfig
     Metrics   *observability.Metrics
     Logger    *slog.Logger
@@ -117,3 +130,17 @@ call (transactional outbox), so they commit together.
 
 Middleware: request ID, structured request logging, panic recovery, OTel (`otelhttp`),
 Prometheus timing, and Redis rate limiting per client.
+
+### Cancellation (synchronous, in the API)
+
+`POST /v1/orders/{id}/cancel` is handled synchronously by the API using the injected services:
+
+1. Load the order; compute `comps, err := domain.CompensationsForCancel(order.Status)`.
+2. If `err != nil` (already shipped/delivered/terminal) → `409 Conflict`.
+3. Run each compensation directly and idempotently: `CompRefundPayment` → `Payment.Refund`,
+   `CompReleaseInventory` → `Inventory.Release`.
+4. `Orders.Transition(from=order.Status, to=CANCELLED, event="cancelled")`. The from-state guard
+   returns `409` if a worker advanced the order concurrently (the client may retry).
+
+This keeps cancellation simple and needs no new job type. Known simplification: it does not set a
+"cancel requested" flag to pre-empt an in-flight forward step; the from-state guard is the safety net.
