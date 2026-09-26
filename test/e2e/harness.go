@@ -10,6 +10,7 @@ package e2e
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -20,6 +21,34 @@ import (
 	"github.com/reddy-aravind/order-fulfillment-orchestrator/internal/store"
 )
 
+// runPostgresContainer starts a PostgreSQL container, converting the panic that
+// some testcontainers versions raise when no Docker host is reachable into an
+// ordinary error so callers can t.Skip instead of crashing the test binary.
+func runPostgresContainer(ctx context.Context) (c *postgres.PostgresContainer, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("docker not available: %v", r)
+		}
+	}()
+	return postgres.Run(ctx, "postgres:16-alpine",
+		postgres.WithDatabase("ofo_test"),
+		postgres.WithUsername("ofo"),
+		postgres.WithPassword("ofo_test_password"),
+		postgres.BasicWaitStrategies(),
+	)
+}
+
+// runRedisContainer starts a Redis container, converting a no-Docker panic into
+// an error (see runPostgresContainer).
+func runRedisContainer(ctx context.Context) (c *tcredis.RedisContainer, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("docker not available: %v", r)
+		}
+	}()
+	return tcredis.Run(ctx, "redis:7-alpine")
+}
+
 // StartPostgres launches a throwaway PostgreSQL container, runs all schema
 // migrations against it, and returns a ready connection pool. If the container
 // cannot start (typically because Docker is unavailable) the current test is
@@ -29,12 +58,7 @@ func StartPostgres(t *testing.T) (dsnURL string, pool *pgxpool.Pool, cleanup fun
 	t.Helper()
 	ctx := context.Background()
 
-	container, err := postgres.Run(ctx, "postgres:16-alpine",
-		postgres.WithDatabase("ofo_test"),
-		postgres.WithUsername("ofo"),
-		postgres.WithPassword("ofo_test_password"),
-		postgres.BasicWaitStrategies(),
-	)
+	container, err := runPostgresContainer(ctx)
 	if err != nil {
 		if container != nil {
 			_ = container.Terminate(ctx)
@@ -82,7 +106,7 @@ func StartRedis(t *testing.T) (addr string, client *redis.Client, cleanup func()
 	t.Helper()
 	ctx := context.Background()
 
-	container, err := tcredis.Run(ctx, "redis:7-alpine")
+	container, err := runRedisContainer(ctx)
 	if err != nil {
 		if container != nil {
 			_ = container.Terminate(ctx)

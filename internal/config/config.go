@@ -76,17 +76,17 @@ type WorkerConfig struct {
 
 // ObservabilityConfig configures tracing, metrics, and logging.
 type ObservabilityConfig struct {
-	OTelEnabled      bool
-	OTLPEndpoint     string
-	ServiceName      string
-	MetricsAddr      string
-	LogLevel         string
+	OTelEnabled  bool
+	OTLPEndpoint string
+	ServiceName  string
+	MetricsAddr  string
+	LogLevel     string
 }
 
 // SimConfig tunes simulated failure behaviour of the mock domain services so
 // demos and tests can exercise the compensation paths deterministically.
 type SimConfig struct {
-	PaymentDeclineRate    float64
+	PaymentDeclineRate     float64
 	FulfillmentFailureRate float64
 }
 

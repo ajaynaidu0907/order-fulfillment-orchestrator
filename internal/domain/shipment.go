@@ -10,10 +10,10 @@ import (
 type ShipmentStatus string
 
 const (
-	ShipmentPending   ShipmentStatus = "pending"    // created, awaiting carrier pickup
+	ShipmentPending    ShipmentStatus = "pending"    // created, awaiting carrier pickup
 	ShipmentDispatched ShipmentStatus = "dispatched" // handed to carrier / in transit
-	ShipmentDelivered ShipmentStatus = "delivered"
-	ShipmentFailed    ShipmentStatus = "failed"
+	ShipmentDelivered  ShipmentStatus = "delivered"
+	ShipmentFailed     ShipmentStatus = "failed"
 )
 
 // Shipment records the physical fulfillment of an order.

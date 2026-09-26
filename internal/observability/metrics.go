@@ -15,7 +15,7 @@ type Metrics struct {
 	HTTPRequests     *prometheus.CounterVec   // by method, route, status
 	HTTPDuration     *prometheus.HistogramVec // by method, route
 	OrdersCreated    prometheus.Counter
-	OrderTransitions *prometheus.CounterVec // by from, to
+	OrderTransitions *prometheus.CounterVec   // by from, to
 	JobsProcessed    *prometheus.CounterVec   // by type, result
 	JobDuration      *prometheus.HistogramVec // by type
 	JobsInflight     prometheus.Gauge
