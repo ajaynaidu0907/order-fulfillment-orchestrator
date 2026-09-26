@@ -1,0 +1,22 @@
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  - job_name: ofo-api
+    static_configs:
+      - targets: ["api:9090"]
+        labels:
+          service: order-fulfillment-orchestrator
+          role: api
+
+  - job_name: ofo-worker
+    static_configs:
+      - targets: ["worker:9090"]
+        labels:
+          service: order-fulfillment-orchestrator
+          role: worker
+
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]

@@ -1,0 +1,23 @@
+# Binaries
+/bin/
+*.exe
+*.out
+*.test
+
+# Environment / secrets (never commit real secrets)
+.env
+.env.local
+*.local.env
+
+# Go build/test artifacts
+vendor/
+coverage.out
+coverage.html
+
+# Generated mock data output
+/testdata/generated/
+
+# OS / editor
+.DS_Store
+.idea/
+*.swp

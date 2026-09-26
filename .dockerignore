@@ -1,0 +1,11 @@
+.git
+.gitignore
+bin/
+*.md
+!README.md
+.env
+.env.local
+coverage.out
+coverage.html
+testdata/generated/
+.github/

@@ -1,0 +1,112 @@
+# Order Fulfillment Orchestrator - full local stack.
+#   docker compose up --build
+#
+# Services:
+#   postgres   - system of record (5432)
+#   redis      - cache / rate limiting / locks (6379)
+#   jaeger     - distributed tracing UI (http://localhost:16686), OTLP on 4318
+#   prometheus - metrics UI (http://localhost:9091)
+#   migrate    - one-shot schema migration, runs before api/worker
+#   api        - HTTP API (http://localhost:8080), metrics on :9090
+#   worker     - background job worker, metrics on :9090 (internal)
+
+x-app-env: &app-env
+  OFO_ENV: development
+  OFO_DB_HOST: postgres
+  OFO_DB_PORT: "5432"
+  OFO_DB_USER: ofo
+  OFO_DB_PASSWORD: ofo_dev_password_change_me
+  OFO_DB_NAME: ofo
+  OFO_DB_SSLMODE: disable
+  OFO_REDIS_ADDR: redis:6379
+  OFO_OTEL_ENABLED: "true"
+  OFO_OTEL_EXPORTER_OTLP_ENDPOINT: jaeger:4318
+  OFO_METRICS_ADDR: ":9090"
+  OFO_LOG_LEVEL: info
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ofo
+      POSTGRES_PASSWORD: ofo_dev_password_change_me
+      POSTGRES_DB: ofo
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ofo -d ofo"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.62.0
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    ports:
+      - "16686:16686" # UI
+      - "4318:4318"   # OTLP HTTP
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ./deploy/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    ports:
+      - "9091:9090" # UI on host 9091 to avoid clashing with app metrics 9090
+
+  migrate:
+    build: .
+    command: ["/usr/local/bin/migrate"]
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    build: .
+    command: ["/usr/local/bin/api"]
+    environment:
+      <<: *app-env
+      OFO_HTTP_ADDR: ":8080"
+    ports:
+      - "8080:8080" # API
+      - "9090:9090" # metrics
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+  worker:
+    build: .
+    command: ["/usr/local/bin/worker"]
+    environment:
+      <<: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    restart: unless-stopped
+
+volumes:
+  pgdata:
